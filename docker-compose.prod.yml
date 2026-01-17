@@ -7,8 +7,7 @@ services:
       - "6379:6379"
 
   backend:
-    # GitHub Actions will replace specific variable
-    image: ${{ secrets.DOCKER_USERNAME }}/uber-backend:latest
+    image: ${DOCKER_USERNAME}/uber-backend:latest
     ports:
       - "4000:4000"
     environment:
@@ -18,7 +17,8 @@ services:
     restart: always
 
   frontend:
-    image: ${{ secrets.DOCKER_USERNAME }}/uber-frontend:latest
+    # CHANGED: Use standard ${DOCKER_USERNAME}
+    image: ${DOCKER_USERNAME}/uber-frontend:latest
     ports:
       - "80:80"
     restart: always
