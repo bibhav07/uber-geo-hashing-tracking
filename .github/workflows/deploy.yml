@@ -5,7 +5,7 @@ on:
     branches: [ "main" ]
 
 jobs:
-  # JOB 1: Build & Push to Docker Hub
+  # JOB 1: Build & Push to Docker Hub | JOB name build and push  and their steps
   build-and-push:
     runs-on: ubuntu-latest
     steps:
@@ -32,7 +32,7 @@ jobs:
         push: true
         tags: ${{ secrets.DOCKER_USERNAME }}/uber-frontend:latest
 
-  # JOB 2: Deploy to EC2 (The Fixed Version)
+  # JOB 2: deply and its steps
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
