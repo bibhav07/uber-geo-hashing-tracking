@@ -1,0 +1,98 @@
+name: Deploy Uber-Lite to AWS
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  # JOB 1: Build & Push to Docker Hub
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    - name: Login to Docker Hub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Build and Push Backend
+      uses: docker/build-push-action@v4
+      with:
+        context: ./backend
+        push: true
+        tags: ${{ secrets.DOCKER_USERNAME }}/uber-backend:latest
+
+    - name: Build and Push Frontend
+      uses: docker/build-push-action@v4
+      with:
+        context: ./frontend
+        push: true
+        tags: ${{ secrets.DOCKER_USERNAME }}/uber-frontend:latest
+
+  # JOB 2: Deploy to EC2 (With Auto-Install Logic)
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    # Inject your username into the docker-compose.prod.yml file
+    - name: Update Docker Compose Image Names
+      run: |
+        sed -i "s/\${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_USERNAME }}/g" docker-compose.prod.yml
+
+    # Send the config file to the server
+    - name: Copy Docker Compose to EC2
+      uses: appleboy/scp-action@master
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USER }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        source: "docker-compose.prod.yml"
+        target: "/home/ubuntu"
+
+    # Connect and Execute
+    - name: Bootstrap and Deploy
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USER }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        script: |
+          echo "🚀 Starting Deployment..."
+
+          # 1. AUTO-INSTALL DOCKER (If missing)
+          if ! command -v docker &> /dev/null
+          then
+              echo "⚠️ Docker not found! Installing..."
+              sudo apt-get update
+              sudo apt-get install -y docker.io docker-compose
+              sudo systemctl start docker
+              sudo systemctl enable docker
+              sudo usermod -aG docker ubuntu
+              echo "✅ Docker installed."
+          fi
+
+          # 2. DEPLOYMENT
+          echo "🔄 Updating Containers..."
+          
+          # Login to Docker Hub (on the server)
+          echo ${{ secrets.DOCKER_PASSWORD }} | sudo docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+
+          # Stop old version
+          sudo docker-compose -f docker-compose.prod.yml down
+
+          # Download new version
+          sudo docker-compose -f docker-compose.prod.yml pull
+
+          # Start new version
+          sudo docker-compose -f docker-compose.prod.yml up -d
+
+          # Cleanup
+          sudo docker image prune -f
+
+          echo "🎉 App is Live!"
