@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+
+  backend:
+    # GitHub Actions will replace specific variable
+    image: ${{ secrets.DOCKER_USERNAME }}/uber-backend:latest
+    ports:
+      - "4000:4000"
+    environment:
+      - REDIS_HOST=redis
+    depends_on:
+      - redis
+    restart: always
+
+  frontend:
+    image: ${{ secrets.DOCKER_USERNAME }}/uber-frontend:latest
+    ports:
+      - "80:80"
+    restart: always
