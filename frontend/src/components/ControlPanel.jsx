@@ -70,7 +70,7 @@ const ControlPanel = ({ role, setRole, setLocation, myLoc, onDrive, status, hasT
            <div style={{color: '#888', fontSize: '11px', marginBottom: '5px'}}>RIDER CONSOLE</div>
            <p style={{fontSize:'13px'}}>
              {status === 'REQUESTING' 
-               ? 'Waiting for driver...' 
+               ? 'Waiting for your ride...' 
                : 'Click a car on the map to request a ride.'}
            </p>
         </StatusBox>
