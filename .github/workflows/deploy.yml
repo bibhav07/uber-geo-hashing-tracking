@@ -32,7 +32,7 @@ jobs:
         push: true
         tags: ${{ secrets.DOCKER_USERNAME }}/uber-frontend:latest
 
-  # JOB 2: Deploy to EC2 (With Auto-Install Logic)
+  # JOB 2: Deploy to EC2 (The Fixed Version)
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
@@ -40,12 +40,7 @@ jobs:
     - name: Checkout Code
       uses: actions/checkout@v3
 
-    # Inject your username into the docker-compose.prod.yml file
-    - name: Update Docker Compose Image Names
-      run: |
-        sed -i "s/\${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_USERNAME }}/g" docker-compose.prod.yml
-
-    # Send the config file to the server
+    # NOTE: We removed the 'sed' step. We just copy the file as-is now.
     - name: Copy Docker Compose to EC2
       uses: appleboy/scp-action@master
       with:
@@ -55,7 +50,7 @@ jobs:
         source: "docker-compose.prod.yml"
         target: "/home/ubuntu"
 
-    # Connect and Execute
+    # Connect and Execute with Environment Variables
     - name: Bootstrap and Deploy
       uses: appleboy/ssh-action@master
       with:
@@ -65,7 +60,11 @@ jobs:
         script: |
           echo "🚀 Starting Deployment..."
 
-          # 1. AUTO-INSTALL DOCKER (If missing)
+          # 1. EXPORT VARIABLE (Crucial Fix)
+          # This makes the username available to the shell
+          export DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
+
+          # 2. AUTO-INSTALL DOCKER
           if ! command -v docker &> /dev/null
           then
               echo "⚠️ Docker not found! Installing..."
@@ -74,23 +73,22 @@ jobs:
               sudo systemctl start docker
               sudo systemctl enable docker
               sudo usermod -aG docker ubuntu
-              echo "✅ Docker installed."
           fi
 
-          # 2. DEPLOYMENT
+          # 3. DEPLOYMENT
           echo "🔄 Updating Containers..."
           
-          # Login to Docker Hub (on the server)
+          # Login
           echo ${{ secrets.DOCKER_PASSWORD }} | sudo docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
 
-          # Stop old version
-          sudo docker-compose -f docker-compose.prod.yml down
+          # Stop old version (Use -E to pass our exported DOCKER_USERNAME to sudo)
+          sudo -E docker-compose -f docker-compose.prod.yml down
 
           # Download new version
-          sudo docker-compose -f docker-compose.prod.yml pull
+          sudo -E docker-compose -f docker-compose.prod.yml pull
 
           # Start new version
-          sudo docker-compose -f docker-compose.prod.yml up -d
+          sudo -E docker-compose -f docker-compose.prod.yml up -d
 
           # Cleanup
           sudo docker image prune -f

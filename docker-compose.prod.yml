@@ -7,6 +7,7 @@ services:
       - "6379:6379"
 
   backend:
+    # Notice the clean variable syntax
     image: ${DOCKER_USERNAME}/uber-backend:latest
     ports:
       - "4000:4000"
@@ -17,7 +18,6 @@ services:
     restart: always
 
   frontend:
-    # CHANGED: Use standard ${DOCKER_USERNAME}
     image: ${DOCKER_USERNAME}/uber-frontend:latest
     ports:
       - "80:80"
